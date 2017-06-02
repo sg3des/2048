@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"runtime"
+	"time"
 
 	"github.com/go-gl/glfw/v3.1/glfw"
 	"github.com/sg3des/fizzgui"
@@ -15,8 +16,7 @@ var (
 	window *glfw.Window
 	gfx    graphicsprovider.GraphicsProvider
 
-	fontPath = "assets/fonts/Roboto-Bold.ttf"
-	fontSize = 41
+	TextFont *fizzgui.Font
 )
 
 func NewWindow(title string, w, h int) error {
@@ -24,14 +24,20 @@ func NewWindow(title string, w, h int) error {
 
 	window, gfx = initGraphics(title, w, h)
 
-	if err := fizzgui.Init(window, gfx); err != nil {
+	err := fizzgui.Init(window, gfx)
+	if err != nil {
 		return fmt.Errorf("Failed initialize fizzgui, reason: %s", err)
 	}
 
 	//load a default font
-	_, err := fizzgui.NewFont("Default", fontPath, fontSize, fizzgui.FontGlyphs)
+	_, err = fizzgui.LoadFont("Default", font, 41, "012345689")
 	if err != nil {
-		return fmt.Errorf("Failed to load the font file: '%s', reason: %s", fontPath, err)
+		return fmt.Errorf("Failed to load the Default font, reason: %s", err)
+	}
+
+	TextFont, err = fizzgui.LoadFont("Text", font, 20, fizzgui.FontGlyphs)
+	if err != nil {
+		return fmt.Errorf("Failed to load the Text font, reason: %s", err)
 	}
 
 	return nil
@@ -39,9 +45,8 @@ func NewWindow(title string, w, h int) error {
 
 func RenderLoop() {
 	for {
-		if window.ShouldClose() {
-			Close()
-		}
+		t := time.Now()
+
 		w, h := window.GetFramebufferSize()
 		gfx.Viewport(0, 0, int32(w), int32(h))
 		gfx.ClearColor(0.4, 0.4, 0.4, 1)
@@ -53,6 +58,13 @@ func RenderLoop() {
 		// draw the screen and get any input
 		window.SwapBuffers()
 		glfw.PollEvents()
+
+		dt := float32(time.Now().Sub(t).Seconds())
+		Transitions(dt)
+
+		if window.ShouldClose() {
+			Close()
+		}
 	}
 }
 

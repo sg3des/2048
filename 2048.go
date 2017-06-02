@@ -13,16 +13,13 @@ import (
 )
 
 var (
-	loose bool
+	lost  bool
 	table *Table
 )
 
-func init() {
-
-	log.SetFlags(log.Lshortfile)
-}
-
 func main() {
+	log.SetFlags(log.Lshortfile)
+
 	if err := NewWindow("2048", 600, 600); err != nil {
 		log.Fatalln(err)
 	}
@@ -38,7 +35,7 @@ func NewGame(_ *fizzgui.Widget) {
 	}
 
 	table = NewTable()
-	loose = false
+	lost = false
 }
 
 //Table is main struct contains matrix 4x4
@@ -60,18 +57,27 @@ func NewTable() *Table {
 
 	for row := 0; row < 4; row++ {
 		for col := 0; col < 4; col++ {
-			t.Items[4*row+col] = t.NewItem()
+			item := t.NewItem()
+			item.transSrc = TransSrc{X: float32(col * 25), Y: float32(row * 25)}
+
+			t.Items[4*row+col] = item
 		}
 	}
 
-	t.NextMove(3)
+	t.NextMove(1)
 
 	return t
 }
 
 type Item struct {
-	N   int
-	btn *fizzgui.Widget
+	N          int
+	btn        *fizzgui.Widget
+	transition bool
+	transSrc   TransSrc
+}
+
+type TransSrc struct {
+	X, Y, W float32
 }
 
 //NewItem created new number square button contains 2 or 4 in any random empty position
@@ -85,14 +91,13 @@ func (t *Table) NewItem() *Item {
 	item.btn.StyleHover = fizzgui.Style{}
 	item.btn.Style.BorderWidth = 0
 
-	item.btn.Layout.SetHeight("25%")
-	item.btn.Layout.SetWidth("25%")
+	item.btn.Layout.SetHeight("0%")
+	item.btn.Layout.SetWidth("0%")
 
 	return item
 }
 
 func (t *Table) NextMove(count int) {
-
 	for i := 0; i < count; i++ {
 		t.FillRandomItem()
 	}
@@ -105,11 +110,15 @@ func (t *Table) NextMove(count int) {
 
 		item.btn.Hidden = false
 
-		col := fmt.Sprintf("%d%%", i%4*25)
-		row := fmt.Sprintf("%d%%", i/4*25)
+		if !item.transition {
+			row := fmt.Sprintf("%d%%", i/4*25)
+			col := fmt.Sprintf("%d%%", i%4*25)
 
-		item.btn.Layout.SetX(col)
-		item.btn.Layout.SetY(row)
+			item.btn.Layout.SetX(col)
+			item.btn.Layout.SetY(row)
+			item.btn.Layout.SetWidth("25%")
+			item.btn.Layout.SetHeight("25%")
+		}
 
 		switch item.N {
 		case 2:
@@ -123,29 +132,82 @@ func (t *Table) NextMove(count int) {
 			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 16:
 			item.btn.Style.BackgroundColor = fizzgui.Color(245, 149, 99, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 32:
 			item.btn.Style.BackgroundColor = fizzgui.Color(245, 124, 95, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 64:
 			item.btn.Style.BackgroundColor = fizzgui.Color(246, 93, 59, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 128:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 206, 113, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 256:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 204, 97, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 512:
 			item.btn.Style.BackgroundColor = fizzgui.Color(236, 200, 80, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 1024:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 197, 63, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 2048:
 			item.btn.Style.BackgroundColor = fizzgui.Color(236, 196, 0, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		}
+	}
+}
+
+func Transitions(dt float32) {
+	if table == nil {
+		return
+	}
+
+	dt = dt * 512
+
+	for i, item := range table.Items {
+		if !item.transition {
+			continue
+		}
+
+		row := float32(i / 4 * 25)
+		col := float32(i % 4 * 25)
+
+		var rowEqual bool
+		if row > item.transSrc.Y+dt {
+			item.transSrc.Y += dt
+			row = item.transSrc.Y
+		} else if row < item.transSrc.Y-dt {
+			item.transSrc.Y -= dt
+			row = item.transSrc.Y
+		} else {
+			rowEqual = true
+		}
+
+		var colEqual bool
+		if col > item.transSrc.X+dt {
+			item.transSrc.X += dt
+			col = item.transSrc.X
+		} else if col < item.transSrc.X-dt {
+			item.transSrc.X -= dt
+			col = item.transSrc.X
+		} else {
+			colEqual = true
+		}
+
+		var widthEqual bool
+		if item.transSrc.W < 25-dt {
+			item.transSrc.W += dt
+		} else {
+			item.transSrc.W = 25
+			widthEqual = true
+		}
+
+		if colEqual && rowEqual && widthEqual {
+			item.transition = false
+		}
+
+		if !widthEqual {
+			col += 12.5 - item.transSrc.W/2
+			row += 12.5 - item.transSrc.W/2
+		}
+
+		item.btn.Layout.SetX(fmt.Sprintf("%.0f%%", col))
+		item.btn.Layout.SetY(fmt.Sprintf("%.0f%%", row))
+		item.btn.Layout.SetWidth(fmt.Sprintf("%0.0f%%", item.transSrc.W))
+		item.btn.Layout.SetHeight(fmt.Sprintf("%0.0f%%", item.transSrc.W))
 	}
 }
 
@@ -161,11 +223,15 @@ func (t *Table) FillRandomItem() {
 		return
 	}
 
-	rc := t.empty[t.rand.Intn(len(t.empty))]
-	item := t.Items[rc]
+	i := t.empty[t.rand.Intn(len(t.empty))]
+	item := t.Items[i]
 
 	item.SetValue(t.newNum())
 	item.btn.Hidden = false
+	item.transition = true
+	item.transSrc.W = 0
+	item.transSrc.X = float32(i % 4 * 25)
+	item.transSrc.Y = float32(i / 4 * 25)
 }
 
 // //newNum return new number 2 or 4
@@ -186,7 +252,9 @@ func (item *Item) Hide() {
 }
 
 func (t *Table) MoveItem(r0, c0, r1, c1 int) {
-	// log.Println(r0, c0, r1, c1)
+	t.Items[4*r0+c0].transition = true
+	t.Items[4*r0+c0].transSrc = TransSrc{X: float32(c0 * 25), Y: float32(r0 * 25), W: 25}
+	// t.Items[4*r0+c0].transDst = [2]int{r1 % 4 * 25, c1 / 4 * 25}
 	t.Items[4*r0+c0], t.Items[4*r1+c1] = t.Items[4*r1+c1], t.Items[4*r0+c0]
 }
 
@@ -226,8 +294,9 @@ func (t *Table) MoveLeft() (moves int) {
 			}
 
 			moves++
-			prev.SetValue(prev.N * 2)
-			item.Hide()
+			prev.Hide()
+			item.SetValue(item.N * 2)
+			table.MoveItem(row, col, r1, c1)
 		}
 	}
 
@@ -270,8 +339,9 @@ func (t *Table) MoveRight() (moves int) {
 			}
 
 			moves++
-			prev.SetValue(prev.N * 2)
-			item.Hide()
+			prev.Hide()
+			item.SetValue(item.N * 2)
+			table.MoveItem(row, col, r1, c1)
 		}
 	}
 
@@ -315,8 +385,9 @@ func (t *Table) MoveUp() (moves int) {
 			}
 
 			moves++
-			prev.SetValue(prev.N * 2)
-			item.Hide()
+			prev.Hide()
+			item.SetValue(item.N * 2)
+			table.MoveItem(row, col, r1, c1)
 		}
 	}
 
@@ -361,8 +432,9 @@ func (t *Table) MoveDown() (moves int) {
 			}
 
 			moves++
-			prev.SetValue(prev.N * 2)
-			item.Hide()
+			prev.Hide()
+			item.SetValue(item.N * 2)
+			table.MoveItem(row, col, r1, c1)
 		}
 	}
 
@@ -379,7 +451,7 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 		return
 	}
 
-	if !loose {
+	if !lost {
 		var moves int
 
 		switch key {
@@ -396,34 +468,35 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 		}
 
 		if moves > 0 {
-			table.NextMove(2)
+			table.NextMove(1)
 		} else {
 
 			for _, item := range table.Items {
 				if item.N == 0 {
-					loose = false
+					lost = false
 					break
 				} else {
-					loose = true
+					lost = true
 
 				}
 			}
 		}
 	}
 
-	if loose {
-		Loose()
+	if lost {
+		Lost()
 	}
 
 }
 
-func Loose() {
-	if loose {
-		loose := table.Container.NewButton("YOU LOOSE! RESTART?", NewGame)
-		loose.Layout.PositionFixed = true
-		loose.Layout.SetWidth("80%")
-		loose.Layout.SetX("10%")
-		loose.Layout.SetY("40%")
+func Lost() {
+	if lost {
+		lostBtn := table.Container.NewButton("YOU LOSE! RESTART?", NewGame)
+		lostBtn.Layout.PositionFixed = true
+		lostBtn.Font = TextFont
+		lostBtn.Layout.SetWidth("80%")
+		lostBtn.Layout.SetX("10%")
+		lostBtn.Layout.SetY("40%")
 	}
 }
 
