@@ -211,7 +211,7 @@ func Transitions(dt float32) {
 
 		var widthEqual bool
 		if item.transSrc.S < 25-dt {
-			item.transSrc.S += dt
+			item.transSrc.S += dt / 4
 		} else {
 			item.transSrc.S = 25
 			widthEqual = true
