@@ -29,12 +29,16 @@ func main() {
 	RenderLoop()
 }
 
+//NewGame - create new table and fill it with 2 items
 func NewGame(_ *fizzgui.Widget) {
 	if table != nil {
 		table.Container.Close()
 	}
 
 	table = NewTable()
+	table.FillRandomItem()
+	table.FillRandomItem()
+	table.ReDraw()
 	lost = false
 }
 
@@ -43,8 +47,7 @@ type Table struct {
 	Container *fizzgui.Container
 	Items     [16]*Item
 
-	rand  *rand.Rand
-	empty []int
+	rand *rand.Rand
 }
 
 //NewTable initialize table
@@ -64,11 +67,10 @@ func NewTable() *Table {
 		}
 	}
 
-	t.NextMove(1)
-
 	return t
 }
 
+//Item is square with number on table
 type Item struct {
 	N          int
 	btn        *fizzgui.Widget
@@ -76,8 +78,9 @@ type Item struct {
 	transSrc   TransSrc
 }
 
+//TransSrc contains X,Y and Size values for transitions
 type TransSrc struct {
-	X, Y, W float32
+	Y, X, S float32
 }
 
 //NewItem created new number square button contains 2 or 4 in any random empty position
@@ -97,18 +100,17 @@ func (t *Table) NewItem() *Item {
 	return item
 }
 
-func (t *Table) NextMove(count int) {
-	for i := 0; i < count; i++ {
-		t.FillRandomItem()
-	}
-
+//ReDraw func update values, positions and styles of items
+func (t *Table) ReDraw() {
 	for i, item := range t.Items {
+
 		if item.N == 0 {
 			item.btn.Hidden = true
 			continue
 		}
 
 		item.btn.Hidden = false
+		item.btn.Text = strconv.Itoa(item.N)
 
 		if !item.transition {
 			row := fmt.Sprintf("%d%%", i/4*25)
@@ -150,6 +152,26 @@ func (t *Table) NextMove(count int) {
 	}
 }
 
+//Dump is print value of items 4x4 to stdout
+func (t *Table) Dump() {
+	for i, item := range t.Items {
+		for _i, _item := range t.Items {
+			if item == _item && i != _i {
+				log.Fatalln("item equal %d == %d", i, _i)
+			}
+		}
+	}
+
+	for r := 0; r < 4; r++ {
+		for c := 0; c < 4; c++ {
+			i := r*4 + c
+			fmt.Printf("%2d:%d ", i, t.Items[i].N)
+		}
+		fmt.Println()
+	}
+}
+
+//Transitions is handle animations
 func Transitions(dt float32) {
 	if table == nil {
 		return
@@ -188,10 +210,10 @@ func Transitions(dt float32) {
 		}
 
 		var widthEqual bool
-		if item.transSrc.W < 25-dt {
-			item.transSrc.W += dt
+		if item.transSrc.S < 25-dt {
+			item.transSrc.S += dt
 		} else {
-			item.transSrc.W = 25
+			item.transSrc.S = 25
 			widthEqual = true
 		}
 
@@ -200,38 +222,43 @@ func Transitions(dt float32) {
 		}
 
 		if !widthEqual {
-			col += 12.5 - item.transSrc.W/2
-			row += 12.5 - item.transSrc.W/2
+			col += 12.5 - item.transSrc.S/2
+			row += 12.5 - item.transSrc.S/2
 		}
 
 		item.btn.Layout.SetX(fmt.Sprintf("%.0f%%", col))
 		item.btn.Layout.SetY(fmt.Sprintf("%.0f%%", row))
-		item.btn.Layout.SetWidth(fmt.Sprintf("%0.0f%%", item.transSrc.W))
-		item.btn.Layout.SetHeight(fmt.Sprintf("%0.0f%%", item.transSrc.W))
+		item.btn.Layout.SetWidth(fmt.Sprintf("%0.0f%%", item.transSrc.S))
+		item.btn.Layout.SetHeight(fmt.Sprintf("%0.0f%%", item.transSrc.S))
 	}
 }
 
+//FillRandomItem - fill random empty position on table with number 2 or 4
 func (t *Table) FillRandomItem() {
-	t.empty = t.empty[:0]
+	var empty []int
 	for i, item := range t.Items {
 		if item.N == 0 {
-			t.empty = append(t.empty, i)
+			empty = append(empty, i)
 		}
 	}
 
-	if len(t.empty) == 0 {
+	if len(empty) == 0 {
 		return
 	}
 
-	i := t.empty[t.rand.Intn(len(t.empty))]
+	i := empty[t.rand.Intn(len(empty))]
+	table.FillItem(i, t.newNum())
+}
+
+//FillItem set value to item on table
+func (t *Table) FillItem(i, num int) {
 	item := t.Items[i]
 
-	item.SetValue(t.newNum())
-	item.btn.Hidden = false
+	item.N = num
 	item.transition = true
-	item.transSrc.W = 0
-	item.transSrc.X = float32(i % 4 * 25)
+	item.transSrc.S = 0
 	item.transSrc.Y = float32(i / 4 * 25)
+	item.transSrc.X = float32(i % 4 * 25)
 }
 
 // //newNum return new number 2 or 4
@@ -242,203 +269,150 @@ func (t *Table) newNum() int {
 	return 4
 }
 
-func (item *Item) SetValue(n int) {
-	item.N = n
-	item.btn.Text = strconv.Itoa(n)
-}
-
-func (item *Item) Hide() {
-	item.N = 0
-}
-
-func (t *Table) MoveItem(r0, c0, r1, c1 int) {
-	t.Items[4*r0+c0].transition = true
-	t.Items[4*r0+c0].transSrc = TransSrc{X: float32(c0 * 25), Y: float32(r0 * 25), W: 25}
-	// t.Items[4*r0+c0].transDst = [2]int{r1 % 4 * 25, c1 / 4 * 25}
-	t.Items[4*r0+c0], t.Items[4*r1+c1] = t.Items[4*r1+c1], t.Items[4*r0+c0]
-}
-
-func (t *Table) LookupPrevItem(row, col int) (int, int, *Item) {
-	for c := col - 1; c >= 0; c-- {
-		if item := t.Items[4*row+c]; item.N > 0 {
-			return row, c, item
-		}
-	}
-
-	return row, 0, nil
-}
-
 func (t *Table) MoveLeft() (moves int) {
-	for row := 0; row < 4; row++ {
-		for col := 0; col < 4; col++ {
-			item := t.Items[4*row+col]
-			if item.N == 0 {
-				continue
-			}
-
-			r1, c1, prev := t.LookupPrevItem(row, col)
-			if prev == nil {
-				if col != c1 {
-					moves++
-					table.MoveItem(row, col, r1, c1)
-				}
-				continue
-			}
-
-			if prev.N != item.N {
-				if col != c1+1 {
-					moves++
-					table.MoveItem(row, col, r1, c1+1)
-				}
-				continue
-			}
-
-			moves++
-			prev.Hide()
-			item.SetValue(item.N * 2)
-			table.MoveItem(row, col, r1, c1)
-		}
+	for r := 0; r < 4; r++ {
+		l := t.GetRow(r).Calculate()
+		moves += t.PutRow(r, l)
 	}
-
 	return
-}
-
-func (t *Table) LookupNextItem(row, col int) (int, int, *Item) {
-	for c := col + 1; c <= 3; c++ {
-		if item := t.Items[4*row+c]; item.N > 0 {
-			return row, c, item
-		}
-	}
-
-	return row, 3, nil
 }
 
 func (t *Table) MoveRight() (moves int) {
-	for row := 0; row < 4; row++ {
-		for col := 3; col >= 0; col-- {
-			item := t.Items[4*row+col]
-			if item.N == 0 {
-				continue
-			}
-
-			r1, c1, prev := t.LookupNextItem(row, col)
-			if prev == nil {
-				if col != c1 {
-					moves++
-					table.MoveItem(row, col, r1, c1)
-				}
-				continue
-			}
-
-			if prev.N != item.N {
-				if col != c1-1 {
-					moves++
-					table.MoveItem(row, col, r1, c1-1)
-				}
-				continue
-			}
-
-			moves++
-			prev.Hide()
-			item.SetValue(item.N * 2)
-			table.MoveItem(row, col, r1, c1)
-		}
+	for r := 0; r < 4; r++ {
+		l := t.GetRow(r).Reverse().Calculate().Reverse()
+		moves += t.PutRow(r, l)
 	}
-
 	return
-}
-
-func (t *Table) LookupPrevItemCol(row, col int) (int, int, *Item) {
-	for r := row - 1; r >= 0; r-- {
-		if item := t.Items[4*r+col]; item.N > 0 {
-			return r, col, item
-		}
-	}
-
-	return 0, col, nil
 }
 
 func (t *Table) MoveUp() (moves int) {
-	for col := 0; col < 4; col++ {
-		for row := 0; row < 4; row++ {
-			item := t.Items[4*row+col]
-			if item.N == 0 {
-				continue
-			}
-
-			r1, c1, prev := t.LookupPrevItemCol(row, col)
-			if prev == nil {
-				if row != r1 {
-					moves++
-					table.MoveItem(row, col, r1, c1)
-				}
-				continue
-			}
-
-			if prev.N != item.N {
-				if row != r1+1 {
-					moves++
-					table.MoveItem(row, col, r1+1, c1)
-				}
-
-				continue
-			}
-
-			moves++
-			prev.Hide()
-			item.SetValue(item.N * 2)
-			table.MoveItem(row, col, r1, c1)
-		}
+	for c := 0; c < 4; c++ {
+		l := t.GetCol(c).Calculate()
+		moves += t.PutCol(c, l)
 	}
-
 	return
-}
-
-func (t *Table) LookupNextItemCol(row, col int) (int, int, *Item) {
-	for r := row + 1; r <= 3; r++ {
-		if item := t.Items[4*r+col]; item.N > 0 {
-			return r, col, item
-		}
-	}
-
-	return 3, col, nil
 }
 
 func (t *Table) MoveDown() (moves int) {
-	for col := 0; col < 4; col++ {
-		for row := 3; row >= 0; row-- {
+	for c := 0; c < 4; c++ {
+		l := t.GetCol(c).Reverse().Calculate().Reverse()
+		moves += t.PutCol(c, l)
+	}
+	return
+}
 
-			item := t.Items[4*row+col]
-			if item.N == 0 {
-				continue
-			}
+//Line contains in from one row or column, Src it original position
+type Line struct {
+	Items [4]*Item
+	Src   [4]int
+}
 
-			r1, c1, prev := t.LookupNextItemCol(row, col)
-			if prev == nil {
-				if row != r1 {
-					moves++
-					table.MoveItem(row, col, r1, c1)
-				}
-				continue
-			}
+//GetRow get 4 items from specify row and return Line
+func (t *Table) GetRow(r int) (l *Line) {
+	l = new(Line)
+	r *= 4
+	for i := 0; i < 4; i++ {
+		l.Items[i] = t.Items[r+i]
+		l.Src[i] = r + i
 
-			if prev.N != item.N {
-				if row != r1-1 {
-					moves++
-					table.MoveItem(row, col, r1-1, c1)
-				}
+	}
+	return
+}
 
-				continue
-			}
-
+//PutRow put line items to table by specify row
+func (t *Table) PutRow(r int, l *Line) (moves int) {
+	r *= 4
+	for i := 0; i < 4; i++ {
+		if t.Items[r+i] != l.Items[i] {
+			t.Items[r+i] = l.Items[i]
 			moves++
-			prev.Hide()
-			item.SetValue(item.N * 2)
-			table.MoveItem(row, col, r1, c1)
 		}
 	}
-
 	return
+}
+
+//GetCol get 4 items for specify column and return Line
+func (t *Table) GetCol(c int) (l *Line) {
+	l = new(Line)
+	for i := 0; i < 4; i++ {
+		l.Items[i] = t.Items[c+i*4]
+		l.Src[i] = c + i*4
+	}
+	return
+}
+
+//PutCol put line items to table by specify column
+func (t *Table) PutCol(c int, l *Line) (moves int) {
+	for i := 0; i < 4; i++ {
+		if t.Items[c+i*4] != l.Items[i] {
+			t.Items[c+i*4] = l.Items[i]
+			moves++
+		}
+	}
+	return
+}
+
+//Reverse line
+func (l *Line) Reverse() *Line {
+	l.Items[0], l.Items[1], l.Items[2], l.Items[3] = l.Items[3], l.Items[2], l.Items[1], l.Items[0]
+	l.Src[0], l.Src[1], l.Src[2], l.Src[3] = l.Src[3], l.Src[2], l.Src[1], l.Src[0]
+	return l
+}
+
+//Calculate is important function it move line items, always to left, calcluate item positions and values.
+func (l *Line) Calculate() *Line {
+	var offset int
+	var prev *Item
+
+	for i, item := range l.Items {
+		if item.N == 0 {
+			continue
+		}
+
+		offset, prev = l.LookupPrev(offset, i)
+		if prev == nil {
+			l.Move(offset, i)
+			continue
+		}
+
+		if prev.N != item.N {
+			offset++
+			l.Move(offset, i)
+			continue
+		}
+
+		prev.N = 0
+		item.N *= 2
+		l.Move(offset, i)
+		offset++
+	}
+
+	return l
+}
+
+//LookupPrev lookup previous items in this line
+func (l *Line) LookupPrev(offset, count int) (int, *Item) {
+	for i := offset; i < count; i++ {
+		if l.Items[i].N != 0 {
+			return i, l.Items[i]
+		}
+	}
+	return offset, nil
+}
+
+//Move - swap 2 items and prepare transition values
+func (l *Line) Move(dst, src int) {
+	if dst == src {
+		return
+	}
+	i := l.Src[src]
+	row := float32(i / 4 * 25)
+	col := float32(i % 4 * 25)
+
+	l.Items[src].transition = true
+	l.Items[src].transSrc = TransSrc{Y: row, X: col, S: 25}
+	l.Items[dst], l.Items[src] = l.Items[src], l.Items[dst]
+	// l.I[dst], l.I[src] = l.I[src], l.I[dst]
 }
 
 func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action, mods glfw.ModifierKey) {
@@ -468,7 +442,8 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 		}
 
 		if moves > 0 {
-			table.NextMove(1)
+			table.FillRandomItem()
+			table.ReDraw()
 		} else {
 
 			for _, item := range table.Items {
@@ -489,6 +464,7 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 
 }
 
+//Lost create lost/restart button
 func Lost() {
 	if lost {
 		lostBtn := table.Container.NewButton("YOU LOSE! RESTART?", NewGame)
