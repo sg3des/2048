@@ -437,8 +437,6 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 			moves = table.MoveUp()
 		case glfw.KeyDown:
 			moves = table.MoveDown()
-		case glfw.KeyEscape:
-
 		}
 
 		if moves > 0 {
