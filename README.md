@@ -1,6 +1,6 @@
 # 2048
 
-2048 cross-platform opengl.
+Cross-platform 2048 game on opengl.
 
 build on linux: 
 
