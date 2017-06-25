@@ -18,5 +18,10 @@ set GOARCH=386
 go build -ldflags -H=windowsgui
 ```
 
+build on osx:
+```sh
+go build -ldflags=-s
+```
+
 ![screenshot](screenshots/2048.png)
 
