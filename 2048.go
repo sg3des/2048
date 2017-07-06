@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
 	"time"
 
@@ -13,17 +14,31 @@ import (
 )
 
 var (
-	lost  bool
-	table *Table
+	lost bool
+
+	header  *Header
+	table   *Table
+	endgame *EndGame
 )
 
-func main() {
-	log.SetFlags(log.Lshortfile)
+var prevMove struct {
+	Items [16]*Item
+	Score int
+	Done  bool
+}
 
-	if err := NewWindow("2048", 600, 600); err != nil {
+func init() {
+	log.SetFlags(log.Lshortfile)
+	os.Chdir(filepath.Dir(os.Args[0]))
+}
+
+func main() {
+	if err := NewWindow("2048", 500, 600); err != nil {
 		log.Fatalln(err)
 	}
 
+	header = NewHeader()
+	endgame = NewEndGame()
 	NewGame(nil)
 
 	RenderLoop()
@@ -35,10 +50,13 @@ func NewGame(_ *fizzgui.Widget) {
 		table.Container.Close()
 	}
 
+	header.NewGame()
+	endgame.Hide()
+
 	table = NewTable()
 	table.FillRandomItem()
 	table.FillRandomItem()
-	table.ReDraw()
+	table.Redraw()
 	lost = false
 }
 
@@ -53,7 +71,7 @@ type Table struct {
 //NewTable initialize table
 func NewTable() *Table {
 	t := &Table{
-		Container: fizzgui.NewContainer("table", "0px", "0px", "100%", "100%"),
+		Container: fizzgui.NewContainer("table", "0px", "100px", "100%", "500px"),
 		rand:      rand.New(rand.NewSource(time.Now().Unix())),
 	}
 	t.Container.Style.BackgroundColor = fizzgui.Color(187, 173, 160, 255)
@@ -90,6 +108,7 @@ func (t *Table) NewItem() *Item {
 	item.btn = t.Container.NewButton(strconv.Itoa(item.N), nil)
 	item.btn.Hidden = true
 	item.btn.Layout.PositionFixed = true
+	item.btn.Font = NumsFont
 
 	item.btn.StyleHover = fizzgui.Style{}
 	item.btn.Style.BorderWidth = 0
@@ -100,8 +119,8 @@ func (t *Table) NewItem() *Item {
 	return item
 }
 
-//ReDraw func update values, positions and styles of items
-func (t *Table) ReDraw() {
+//Redraw func update values, positions and styles of items
+func (t *Table) Redraw() {
 	for i, item := range t.Items {
 
 		if item.N == 0 {
@@ -153,9 +172,9 @@ func (t *Table) ReDraw() {
 }
 
 //Dump is print value of items 4x4 to stdout
-func (t *Table) Dump() {
-	for i, item := range t.Items {
-		for _i, _item := range t.Items {
+func TableDump(items [16]*Item) {
+	for i, item := range items {
+		for _i, _item := range items {
 			if item == _item && i != _i {
 				log.Fatalln("item equal %d == %d", i, _i)
 			}
@@ -165,7 +184,7 @@ func (t *Table) Dump() {
 	for r := 0; r < 4; r++ {
 		for c := 0; c < 4; c++ {
 			i := r*4 + c
-			fmt.Printf("%2d:%d ", i, t.Items[i].N)
+			fmt.Printf("%2d ", items[i].N)
 		}
 		fmt.Println()
 	}
@@ -269,40 +288,45 @@ func (t *Table) newNum() int {
 	return 4
 }
 
-func (t *Table) MoveLeft() (moves int) {
+func (t *Table) MoveLeft() (moves, score int) {
 	for r := 0; r < 4; r++ {
 		l := t.GetRow(r).Calculate()
 		moves += t.PutRow(r, l)
+		score += l.Score
 	}
 	return
 }
 
-func (t *Table) MoveRight() (moves int) {
+func (t *Table) MoveRight() (moves, score int) {
 	for r := 0; r < 4; r++ {
 		l := t.GetRow(r).Reverse().Calculate().Reverse()
 		moves += t.PutRow(r, l)
+		score += l.Score
 	}
 	return
 }
 
-func (t *Table) MoveUp() (moves int) {
+func (t *Table) MoveUp() (moves, score int) {
 	for c := 0; c < 4; c++ {
 		l := t.GetCol(c).Calculate()
 		moves += t.PutCol(c, l)
+		score += l.Score
 	}
 	return
 }
 
-func (t *Table) MoveDown() (moves int) {
+func (t *Table) MoveDown() (moves, score int) {
 	for c := 0; c < 4; c++ {
 		l := t.GetCol(c).Reverse().Calculate().Reverse()
 		moves += t.PutCol(c, l)
+		score += l.Score
 	}
 	return
 }
 
 //Line contains in from one row or column, Src it original position
 type Line struct {
+	Score int
 	Items [4]*Item
 	Src   [4]int
 }
@@ -383,6 +407,7 @@ func (l *Line) Calculate() *Line {
 
 		prev.N = 0
 		item.N *= 2
+		l.Score += item.N
 		l.Move(offset, i)
 		offset++
 	}
@@ -426,22 +451,55 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 	}
 
 	if !lost {
-		var moves int
+		if key == glfw.KeyLeft || key == glfw.KeyRight || key == glfw.KeyUp || key == glfw.KeyDown {
+			for i := range prevMove.Items {
+				prevMove.Items[i] = new(Item)
+				*prevMove.Items[i] = *table.Items[i]
+				*prevMove.Items[i].btn = *table.Items[i].btn
+			}
+			prevMove.Score = header.curr.Score
+			prevMove.Done = false
+		}
+
+		var moves, score int
 
 		switch key {
 		case glfw.KeyLeft:
-			moves = table.MoveLeft()
+			moves, score = table.MoveLeft()
 		case glfw.KeyRight:
-			moves = table.MoveRight()
+			moves, score = table.MoveRight()
 		case glfw.KeyUp:
-			moves = table.MoveUp()
+			moves, score = table.MoveUp()
 		case glfw.KeyDown:
-			moves = table.MoveDown()
+			moves, score = table.MoveDown()
+		case glfw.KeyBackspace:
+			if prevMove.Done {
+				return
+			}
+
+			for i, item := range prevMove.Items {
+				if item == nil {
+					return
+				}
+				*table.Items[i] = *item
+				*table.Items[i].btn = *item.btn
+			}
+			table.Redraw()
+
+			header.curr.Score = prevMove.Score
+			header.UpdateCurr()
+
+			prevMove.Done = true
+			return
+		}
+
+		if score > 0 {
+			header.AddScore(score)
 		}
 
 		if moves > 0 {
 			table.FillRandomItem()
-			table.ReDraw()
+			table.Redraw()
 		} else {
 
 			for _, item := range table.Items {
@@ -450,28 +508,68 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 					break
 				} else {
 					lost = true
-
 				}
 			}
+
+			if lost == true {
+				endgame.Show()
+			}
+
 		}
 	}
-
-	if lost {
-		Lost()
-	}
-
 }
 
-//Lost create lost/restart button
-func Lost() {
-	if lost {
-		lostBtn := table.Container.NewButton("YOU LOSE! RESTART?", NewGame)
-		lostBtn.Layout.PositionFixed = true
-		lostBtn.Font = TextFont
-		lostBtn.Layout.SetWidth("80%")
-		lostBtn.Layout.SetX("10%")
-		lostBtn.Layout.SetY("40%")
-	}
+type EndGame struct {
+	Container *fizzgui.Container
+	Score     *fizzgui.Widget
+}
+
+//NewEndGame create lost/restart button
+func NewEndGame() *EndGame {
+	e := new(EndGame)
+	e.Container = fizzgui.NewContainer("endgame", "10%", "30%", "80%", "45%")
+	e.Container.Style.BackgroundColor = fizzgui.Color(246, 93, 59, 255)
+	e.Container.Zorder = 2
+	e.Container.Hidden = true
+
+	white := fizzgui.Color(255, 255, 255, 255)
+
+	gameend := e.Container.NewText("Game end!")
+	gameend.Layout.SetWidth("100%")
+	gameend.TextAlign = fizzgui.TALIGN_CENTER
+	gameend.Style.TextColor = white
+
+	e.Score = e.Container.NewText(fmt.Sprintf("Your score: %d", header.curr.Score))
+	e.Score.Layout.SetWidth("100%")
+	e.Score.TextAlign = fizzgui.TALIGN_CENTER
+	e.Score.Style.TextColor = white
+	e.Score.Font = TextFontSmall
+
+	name := e.Container.NewText("Your name:")
+	name.Style.TextColor = white
+	name.Font = TextFontSmall
+	input := e.Container.NewInput("name", &header.curr.Name, nil)
+	input.Style.TextColor = white
+	input.Font = TextFont
+
+	restart := e.Container.NewButton("RESTART", NewGame)
+	restart.Layout.SetX("20%")
+	restart.Layout.SetWidth("60%")
+	restart.Layout.SetHeight("50px")
+	restart.Layout.PositionFixed = true
+	restart.Layout.VAlign = fizzgui.VAlignBottom
+	restart.Style.TextColor = white
+
+	return e
+}
+
+func (e *EndGame) Hide() {
+	e.Container.Hidden = true
+}
+
+func (e *EndGame) Show() {
+	e.Container.Hidden = false
+	e.Score.Text = fmt.Sprintf("Your score: %d", header.curr.Score)
 }
 
 //Close it`s callback from renderLoop, should close application

@@ -16,7 +16,11 @@ var (
 	window *glfw.Window
 	gfx    graphicsprovider.GraphicsProvider
 
-	TextFont *fizzgui.Font
+	fontfilename = "Roboto-Black.ttf"
+
+	TextFont      *fizzgui.Font
+	TextFontSmall *fizzgui.Font
+	NumsFont      *fizzgui.Font
 )
 
 func NewWindow(title string, w, h int) error {
@@ -29,15 +33,20 @@ func NewWindow(title string, w, h int) error {
 		return fmt.Errorf("Failed initialize fizzgui, reason: %s", err)
 	}
 
-	//load a default font
-	_, err = fizzgui.LoadFont("Default", font, 41, "012345689")
-	if err != nil {
-		return fmt.Errorf("Failed to load the Default font, reason: %s", err)
-	}
-
-	TextFont, err = fizzgui.LoadFont("Text", font, 20, fizzgui.FontGlyphs)
+	TextFont, err = fizzgui.NewFont("Default", fontfilename, 28, fizzgui.FontGlyphs)
 	if err != nil {
 		return fmt.Errorf("Failed to load the Text font, reason: %s", err)
+	}
+
+	TextFontSmall, err = fizzgui.NewFont("Text", fontfilename, 20, fizzgui.FontGlyphs)
+	if err != nil {
+		return fmt.Errorf("Failed to load the Text font, reason: %s", err)
+	}
+
+	//load a default font
+	NumsFont, err = fizzgui.NewFont("Nums", fontfilename, 41, "012345689")
+	if err != nil {
+		return fmt.Errorf("Failed to load the Default font, reason: %s", err)
 	}
 
 	return nil
@@ -49,7 +58,7 @@ func RenderLoop() {
 
 		w, h := window.GetFramebufferSize()
 		gfx.Viewport(0, 0, int32(w), int32(h))
-		gfx.ClearColor(0.4, 0.4, 0.4, 1)
+		gfx.ClearColor(0.9, 0.9, 0.9, 1)
 		gfx.Clear(graphicsprovider.COLOR_BUFFER_BIT | graphicsprovider.DEPTH_BUFFER_BIT)
 
 		// draw the user interface
@@ -102,7 +111,7 @@ func initGraphics(title string, w int, h int) (*glfw.Window, graphicsprovider.Gr
 	fizzle.SetGraphics(gfx)
 
 	// set some additional OpenGL flags
-	gfx.BlendEquation(graphicsprovider.FUNC_ADD)
+	// gfx.BlendEquation(graphicsprovider.FUNC_ADD)
 	gfx.BlendFunc(graphicsprovider.SRC_ALPHA, graphicsprovider.ONE_MINUS_SRC_ALPHA)
 	gfx.Enable(graphicsprovider.BLEND)
 	gfx.Enable(graphicsprovider.TEXTURE_2D)
