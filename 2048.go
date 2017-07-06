@@ -14,17 +14,16 @@ import (
 )
 
 var (
-	lost bool
-
 	header  *Header
 	table   *Table
 	endgame *EndGame
+
+	prevMove *PrevMove
 )
 
-var prevMove struct {
+type PrevMove struct {
 	Items [16]*Item
 	Score int
-	Done  bool
 }
 
 func init() {
@@ -57,7 +56,6 @@ func NewGame(_ *fizzgui.Widget) {
 	table.FillRandomItem()
 	table.FillRandomItem()
 	table.Redraw()
-	lost = false
 }
 
 //Table is main struct contains matrix 4x4
@@ -66,6 +64,7 @@ type Table struct {
 	Items     [16]*Item
 
 	rand *rand.Rand
+	lost bool
 }
 
 //NewTable initialize table
@@ -73,6 +72,7 @@ func NewTable() *Table {
 	t := &Table{
 		Container: fizzgui.NewContainer("table", "0px", "100px", "100%", "500px"),
 		rand:      rand.New(rand.NewSource(time.Now().Unix())),
+		lost:      false,
 	}
 	t.Container.Style.BackgroundColor = fizzgui.Color(187, 173, 160, 255)
 
@@ -450,72 +450,76 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 		return
 	}
 
-	if !lost {
-		if key == glfw.KeyLeft || key == glfw.KeyRight || key == glfw.KeyUp || key == glfw.KeyDown {
-			for i := range prevMove.Items {
-				prevMove.Items[i] = new(Item)
-				*prevMove.Items[i] = *table.Items[i]
-				*prevMove.Items[i].btn = *table.Items[i].btn
-			}
-			prevMove.Score = header.curr.Score
-			prevMove.Done = false
+	if table.lost {
+		return
+	}
+
+	var moves, score int
+
+	var pm = new(PrevMove)
+
+	if key == glfw.KeyLeft || key == glfw.KeyRight || key == glfw.KeyUp || key == glfw.KeyDown {
+		for i, item := range table.Items {
+			pm.Items[i] = new(Item)
+			*pm.Items[i] = *item
+			*pm.Items[i].btn = *item.btn
 		}
+		pm.Score = header.curr.Score
+	}
 
-		var moves, score int
-
-		switch key {
-		case glfw.KeyLeft:
-			moves, score = table.MoveLeft()
-		case glfw.KeyRight:
-			moves, score = table.MoveRight()
-		case glfw.KeyUp:
-			moves, score = table.MoveUp()
-		case glfw.KeyDown:
-			moves, score = table.MoveDown()
-		case glfw.KeyBackspace:
-			if prevMove.Done {
-				return
-			}
-
-			for i, item := range prevMove.Items {
-				if item == nil {
-					return
-				}
-				*table.Items[i] = *item
-				*table.Items[i].btn = *item.btn
-			}
-			table.Redraw()
-
-			header.curr.Score = prevMove.Score
-			header.UpdateCurr()
-
-			prevMove.Done = true
+	switch key {
+	case glfw.KeyLeft:
+		moves, score = table.MoveLeft()
+	case glfw.KeyRight:
+		moves, score = table.MoveRight()
+	case glfw.KeyUp:
+		moves, score = table.MoveUp()
+	case glfw.KeyDown:
+		moves, score = table.MoveDown()
+	case glfw.KeyBackspace:
+		if prevMove == nil {
 			return
 		}
 
-		if score > 0 {
-			header.AddScore(score)
+		for i, item := range prevMove.Items {
+			if item == nil {
+				return
+			}
+			*table.Items[i] = *item
+			*table.Items[i].btn = *item.btn
+		}
+		table.Redraw()
+
+		header.curr.Score = prevMove.Score
+		header.UpdateCurr()
+
+		prevMove = nil
+		return
+	}
+
+	if score > 0 {
+		header.AddScore(score)
+	}
+
+	if moves > 0 {
+		prevMove = pm
+		table.FillRandomItem()
+		table.Redraw()
+	} else {
+
+		for _, item := range table.Items {
+			if item.N == 0 {
+				table.lost = false
+				break
+			} else {
+				table.lost = true
+			}
 		}
 
-		if moves > 0 {
-			table.FillRandomItem()
-			table.Redraw()
-		} else {
-
-			for _, item := range table.Items {
-				if item.N == 0 {
-					lost = false
-					break
-				} else {
-					lost = true
-				}
-			}
-
-			if lost == true {
-				endgame.Show()
-			}
-
+		if table.lost == true {
+			endgame.Show()
 		}
+
 	}
 }
 
