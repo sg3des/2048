@@ -3,8 +3,8 @@
 Cross-platform 2048 game on opengl.
 
 Keys:
-*Arrows(Left,Right,Top,Bottom) to move the tiles
-*Backspace return to the previous move
+- Arrows(Left,Right,Top,Bottom) to move the tiles
+- Backspace return to the previous move
 
 ## BUILD
 
