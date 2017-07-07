@@ -1,18 +1,17 @@
 package main
 
 import (
-	"bufio"
+	"encoding/gob"
 	"fmt"
-	"io/ioutil"
+	"log"
 	"os"
 	"sort"
 	"strconv"
-	"strings"
 
 	"github.com/sg3des/fizzgui"
 )
 
-var leaderboardFilename = "leaderboard.txt"
+var leaderboardFilename = "leaderboard"
 
 //Header struct contains information of current score and best results
 type Header struct {
@@ -82,23 +81,23 @@ func (*Header) newWdiget(c *fizzgui.Container, text, h string, f *fizzgui.Font) 
 }
 
 type LeaderBoard struct {
-	users []User
+	Users []User
 }
 
 func (lb LeaderBoard) Len() int {
-	return len(lb.users)
+	return len(lb.Users)
 }
 
 func (lb LeaderBoard) Less(i, j int) bool {
-	return lb.users[i].Score < lb.users[j].Score
+	return lb.Users[i].Score < lb.Users[j].Score
 }
 
 func (lb LeaderBoard) Swap(i, j int) {
-	lb.users[i], lb.users[j] = lb.users[j], lb.users[i]
+	lb.Users[i], lb.Users[j] = lb.Users[j], lb.Users[i]
 }
 
 func (lb LeaderBoard) ToWrite() (data []byte) {
-	for _, u := range lb.users {
+	for _, u := range lb.Users {
 		data = append(data, []byte(fmt.Sprintf("%d %s\r\n", u.Score, u.Name))...)
 	}
 
@@ -111,31 +110,16 @@ func (s *Header) loadLeaderBoard() {
 		return
 	}
 
-	scanner := bufio.NewScanner(f)
-	for scanner.Scan() {
-		a := strings.Split(scanner.Text(), " ")
-
-		var u User
-
-		if len(a) > 0 && a[0] != "" {
-			u.Score, err = strconv.Atoi(a[0])
-			if err != nil {
-				continue
-			}
-		}
-
-		if len(a) > 1 && a[1] != "" {
-			u.Name = a[1]
-		}
-
-		if u.Score > s.best.Score {
-			s.best = u
-		}
-
-		s.LeaderBoard.users = append(s.LeaderBoard.users, u)
+	err = gob.NewDecoder(f).Decode(&s.LeaderBoard)
+	if err != nil {
+		log.Println(err)
 	}
-
 	sort.Sort(s.LeaderBoard)
+
+	for i := len(s.LeaderBoard.Users) - 1; i > 0; i-- {
+		s.best = s.LeaderBoard.Users[i]
+		break
+	}
 }
 
 func (s *Header) AddScore(score int) {
@@ -158,13 +142,25 @@ func (s *Header) NewGame() {
 }
 
 func (s *Header) writeLeaderBoard() {
-	s.LeaderBoard.users = append(s.LeaderBoard.users, s.curr)
+	s.LeaderBoard.Users = append(s.LeaderBoard.Users, s.curr)
 	sort.Sort(s.LeaderBoard)
-	if len(s.LeaderBoard.users) > 9 {
-		s.LeaderBoard.users = s.LeaderBoard.users[:10]
+	if len(s.LeaderBoard.Users) > 9 {
+		s.LeaderBoard.Users = s.LeaderBoard.Users[:10]
 	}
 
-	ioutil.WriteFile(leaderboardFilename, s.LeaderBoard.ToWrite(), 0644)
+	f, err := os.OpenFile(leaderboardFilename, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println("failed open %s for store result", leaderboardFilename)
+		return
+	}
+	defer f.Close()
+
+	err = gob.NewEncoder(f).Encode(s.LeaderBoard)
+	if err != nil {
+		log.Println("failed encode data,", err)
+	}
+
+	// ioutil.WriteFile(leaderboardFilename, s.LeaderBoard.ToWrite(), 0644)
 }
 
 func (s *Header) UpdateBest() {

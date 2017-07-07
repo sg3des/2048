@@ -1,6 +1,8 @@
 package main
 
 import (
+	"encoding/gob"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -19,6 +21,9 @@ var (
 	endgame *EndGame
 
 	prevMove *PrevMove
+
+	saveFile     *os.File
+	saveFilename = "2048.save"
 )
 
 type PrevMove struct {
@@ -32,13 +37,21 @@ func init() {
 }
 
 func main() {
-	if err := NewWindow("2048", 500, 600); err != nil {
+	err := NewWindow("2048", 500, 600)
+	if err != nil {
 		log.Fatalln(err)
+	}
+
+	gob.Register(LeaderBoard{})
+
+	saveFile, err = os.OpenFile(saveFilename, os.O_CREATE|os.O_RDWR, 0644)
+	if err != nil {
+		log.Println("failed open file with saved game state, ", err)
 	}
 
 	header = NewHeader()
 	endgame = NewEndGame()
-	NewGame(nil)
+	LoadGame()
 
 	RenderLoop()
 }
@@ -56,6 +69,36 @@ func NewGame(_ *fizzgui.Widget) {
 	table.FillRandomItem()
 	table.FillRandomItem()
 	table.Redraw()
+}
+
+//LoadGame restore save state
+func LoadGame() {
+	var items [16]int
+
+	err := gob.NewDecoder(saveFile).Decode(&items)
+	if err != nil {
+		NewGame(nil)
+		return
+	}
+
+	table = NewTable()
+	for i, n := range items {
+		table.Items[i].N = n
+	}
+
+	table.Redraw()
+}
+
+//SaveGame write state to file
+func SaveGame() error {
+	if table == nil {
+		return errors.New("table is nil")
+	}
+
+	saveFile.Truncate(0)
+	saveFile.Seek(0, 0)
+
+	return gob.NewEncoder(saveFile).Encode(table.TableState())
 }
 
 //Table is main struct contains matrix 4x4
@@ -117,6 +160,13 @@ func (t *Table) NewItem() *Item {
 	item.btn.Layout.SetWidth("0%")
 
 	return item
+}
+
+func (t *Table) TableState() (items [16]int) {
+	for i, item := range t.Items {
+		items[i] = item.N
+	}
+	return
 }
 
 //Redraw func update values, positions and styles of items
@@ -505,6 +555,9 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 		prevMove = pm
 		table.FillRandomItem()
 		table.Redraw()
+		if err := SaveGame(); err != nil {
+			log.Println("failed save game")
+		}
 	} else {
 
 		for _, item := range table.Items {
@@ -574,6 +627,9 @@ func (e *EndGame) Hide() {
 func (e *EndGame) Show() {
 	e.Container.Hidden = false
 	e.Score.Text = fmt.Sprintf("Your score: %d", header.curr.Score)
+
+	saveFile.Truncate(0)
+	saveFile.Seek(0, 0)
 }
 
 //Close it`s callback from renderLoop, should close application
