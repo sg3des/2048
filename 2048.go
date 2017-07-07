@@ -20,14 +20,14 @@ var (
 	table   *Table
 	endgame *EndGame
 
-	prevMove *PrevMove
+	prevMove *TableState
 
 	saveFile     *os.File
 	saveFilename = "2048.save"
 )
 
-type PrevMove struct {
-	Items [16]*Item
+type TableState struct {
+	Items [16]int
 	Score int
 }
 
@@ -43,6 +43,7 @@ func main() {
 	}
 
 	gob.Register(LeaderBoard{})
+	gob.Register(TableState{})
 
 	saveFile, err = os.OpenFile(saveFilename, os.O_CREATE|os.O_RDWR, 0644)
 	if err != nil {
@@ -73,20 +74,24 @@ func NewGame(_ *fizzgui.Widget) {
 
 //LoadGame restore save state
 func LoadGame() {
-	var items [16]int
+	var state = TableState{}
 
-	err := gob.NewDecoder(saveFile).Decode(&items)
+	err := gob.NewDecoder(saveFile).Decode(&state)
 	if err != nil {
+		log.Println(err)
 		NewGame(nil)
 		return
 	}
 
 	table = NewTable()
-	for i, n := range items {
+	for i, n := range state.Items {
 		table.Items[i].N = n
 	}
-
 	table.Redraw()
+
+	header.curr.Score = state.Score
+	header.UpdateCurr()
+
 }
 
 //SaveGame write state to file
@@ -162,11 +167,23 @@ func (t *Table) NewItem() *Item {
 	return item
 }
 
-func (t *Table) TableState() (items [16]int) {
+func (t *Table) TableState() *TableState {
+	ts := new(TableState)
 	for i, item := range t.Items {
-		items[i] = item.N
+		ts.Items[i] = item.N
 	}
-	return
+	ts.Score = header.curr.Score
+	return ts
+}
+
+func (t *Table) RestoreState(ts *TableState) {
+	for i, n := range ts.Items {
+		t.Items[i].N = n
+	}
+	t.Redraw()
+
+	header.curr.Score = ts.Score
+	header.UpdateCurr()
 }
 
 //Redraw func update values, positions and styles of items
@@ -203,20 +220,28 @@ func (t *Table) Redraw() {
 			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 16:
 			item.btn.Style.BackgroundColor = fizzgui.Color(245, 149, 99, 255)
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 32:
 			item.btn.Style.BackgroundColor = fizzgui.Color(245, 124, 95, 255)
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 64:
 			item.btn.Style.BackgroundColor = fizzgui.Color(246, 93, 59, 255)
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 128:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 206, 113, 255)
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 256:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 204, 97, 255)
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 512:
 			item.btn.Style.BackgroundColor = fizzgui.Color(236, 200, 80, 255)
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 1024:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 197, 63, 255)
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 2048:
 			item.btn.Style.BackgroundColor = fizzgui.Color(236, 196, 0, 255)
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		}
 	}
 }
@@ -506,15 +531,16 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 
 	var moves, score int
 
-	var pm = new(PrevMove)
+	var pm *TableState
 
 	if key == glfw.KeyLeft || key == glfw.KeyRight || key == glfw.KeyUp || key == glfw.KeyDown {
-		for i, item := range table.Items {
-			pm.Items[i] = new(Item)
-			*pm.Items[i] = *item
-			*pm.Items[i].btn = *item.btn
-		}
-		pm.Score = header.curr.Score
+		pm = table.TableState()
+		// for i, item := range table.Items {
+		// 	pm.Items[i] = new(Item)
+		// 	*pm.Items[i] = *item
+		// 	*pm.Items[i].btn = *item.btn
+		// }
+		// pm.Score = header.curr.Score
 	}
 
 	switch key {
@@ -530,19 +556,7 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 		if prevMove == nil {
 			return
 		}
-
-		for i, item := range prevMove.Items {
-			if item == nil {
-				return
-			}
-			*table.Items[i] = *item
-			*table.Items[i].btn = *item.btn
-		}
-		table.Redraw()
-
-		header.curr.Score = prevMove.Score
-		header.UpdateCurr()
-
+		table.RestoreState(prevMove)
 		prevMove = nil
 		return
 	}
