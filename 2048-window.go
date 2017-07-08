@@ -111,7 +111,7 @@ func initGraphics(title string, w int, h int) (*glfw.Window, graphicsprovider.Gr
 	fizzle.SetGraphics(gfx)
 
 	// set some additional OpenGL flags
-	// gfx.BlendEquation(graphicsprovider.FUNC_ADD)
+	gfx.BlendEquation(graphicsprovider.FUNC_ADD)
 	gfx.BlendFunc(graphicsprovider.SRC_ALPHA, graphicsprovider.ONE_MINUS_SRC_ALPHA)
 	gfx.Enable(graphicsprovider.BLEND)
 	gfx.Enable(graphicsprovider.TEXTURE_2D)

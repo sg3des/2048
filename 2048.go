@@ -78,7 +78,6 @@ func LoadGame() {
 
 	err := gob.NewDecoder(saveFile).Decode(&state)
 	if err != nil {
-		log.Println(err)
 		NewGame(nil)
 		return
 	}
@@ -118,7 +117,7 @@ type Table struct {
 //NewTable initialize table
 func NewTable() *Table {
 	t := &Table{
-		Container: fizzgui.NewContainer("table", "0px", "100px", "100%", "500px"),
+		Container: fizzgui.NewContainer("table", "1", "100", "100%", "500px"),
 		rand:      rand.New(rand.NewSource(time.Now().Unix())),
 		lost:      false,
 	}
