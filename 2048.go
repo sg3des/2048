@@ -207,40 +207,35 @@ func (t *Table) Redraw() {
 			item.btn.Layout.SetHeight("25%")
 		}
 
+		if item.N < 8 {
+			item.btn.Style.TextColor = fizzgui.Color(80, 80, 80, 255)
+		} else {
+			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
+		}
+
 		switch item.N {
 		case 2:
 			item.btn.Style.BackgroundColor = fizzgui.Color(238, 228, 218, 255)
-			item.btn.Style.TextColor = fizzgui.Color(80, 80, 80, 255)
 		case 4:
 			item.btn.Style.BackgroundColor = fizzgui.Color(236, 224, 200, 255)
-			item.btn.Style.TextColor = fizzgui.Color(80, 80, 80, 255)
 		case 8:
 			item.btn.Style.BackgroundColor = fizzgui.Color(242, 177, 121, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 16:
 			item.btn.Style.BackgroundColor = fizzgui.Color(245, 149, 99, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 32:
 			item.btn.Style.BackgroundColor = fizzgui.Color(245, 124, 95, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 64:
 			item.btn.Style.BackgroundColor = fizzgui.Color(246, 93, 59, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 128:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 206, 113, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 256:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 204, 97, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 512:
 			item.btn.Style.BackgroundColor = fizzgui.Color(236, 200, 80, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 1024:
 			item.btn.Style.BackgroundColor = fizzgui.Color(237, 197, 63, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		case 2048:
 			item.btn.Style.BackgroundColor = fizzgui.Color(236, 196, 0, 255)
-			item.btn.Style.TextColor = fizzgui.Color(249, 246, 241, 255)
 		}
 	}
 }
